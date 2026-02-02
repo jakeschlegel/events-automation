@@ -1,0 +1,15 @@
+{
+  "name": "splash-webflow-sync",
+  "version": "1.0.0",
+  "description": "Sync events from Splash to Webflow CMS",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "debug": "DEBUG=true node index.js"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "keywords": ["splash", "webflow", "sync", "events"],
+  "license": "MIT"
+}

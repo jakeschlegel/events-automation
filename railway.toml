@@ -1,0 +1,6 @@
+[build]
+builder = "nixpacks"
+
+[deploy]
+# Run every hour at minute 0
+cronSchedule = "0 * * * *"
