@@ -1,12 +1,14 @@
 /**
  * Splash → Webflow Event Sync
- * 
+ *
  * Polls Splash for events and creates them in Webflow CMS.
  * Uses Splash-ID field to prevent duplicates.
- * 
+ *
  * Environment variables required:
  * - SPLASH_CLIENT_ID
  * - SPLASH_CLIENT_SECRET
+ * - SPLASH_USERNAME (your Splash login email)
+ * - SPLASH_PASSWORD (your Splash login password)
  * - WEBFLOW_API_TOKEN
  * - WEBFLOW_COLLECTION_ID (default: 69650c17f7e5c3ac3938b16d)
  */
@@ -24,9 +26,12 @@ async function getSplashAccessToken() {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
-      grant_type: 'client_credentials',
+      grant_type: 'password',
       client_id: process.env.SPLASH_CLIENT_ID,
       client_secret: process.env.SPLASH_CLIENT_SECRET,
+      scope: 'user',
+      username: process.env.SPLASH_USERNAME,
+      password: process.env.SPLASH_PASSWORD,
     }),
   });
 
@@ -136,12 +141,12 @@ async function createWebflowEvent(eventData) {
 function mapSplashToWebflow(splashEvent) {
   /**
    * Map Splash event fields to Webflow collection fields.
-   * Adjust the splash field names below based on actual API response.
+   * Based on actual Splash API v2.2 response structure.
    * Run with DEBUG=true to see raw Splash data.
    */
 
-  const title = splashEvent.title || splashEvent.name || 'Untitled Event';
-  
+  const title = splashEvent.title || 'Untitled Event';
+
   // Generate slug from title
   const slug = title
     .toLowerCase()
@@ -149,36 +154,37 @@ function mapSplashToWebflow(splashEvent) {
     .replace(/^-|-$/g, '')
     .substring(0, 100);
 
-  // Parse date/time - Splash typically uses ISO format or separate fields
+  // Parse date/time from event_start (ISO format like "2020-09-30T19:00:00-0400")
   let eventDate = null;
   let eventTime = '';
-  
-  if (splashEvent.event_start || splashEvent.start_date || splashEvent.date) {
-    const dateStr = splashEvent.event_start || splashEvent.start_date || splashEvent.date;
-    const dateObj = new Date(dateStr);
+
+  if (splashEvent.event_start) {
+    const dateObj = new Date(splashEvent.event_start);
     if (!isNaN(dateObj.getTime())) {
       eventDate = dateObj.toISOString();
-      eventTime = dateObj.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
+      eventTime = dateObj.toLocaleTimeString('en-US', {
+        hour: 'numeric',
         minute: '2-digit',
-        hour12: true 
+        hour12: true,
       });
     }
   }
 
-  // Location parsing - Splash may nest this
-  const venue = splashEvent.venue || splashEvent.location || {};
-  const locationCity = venue.city || splashEvent.city || '';
-  const locationState = venue.state || splashEvent.state || '';
+  // Location - direct fields on event
+  const locationCity = splashEvent.city || '';
+  const locationState = splashEvent.state || '';
+
+  // Event type - nested object with name
+  const eventType = splashEvent.event_type?.name || '';
 
   // Build the field data object
   const fieldData = {
     'name': title,
     'slug': slug,
     'splash-id': String(splashEvent.id),
-    'splash-url': splashEvent.url || splashEvent.event_url || splashEvent.registration_url || '',
-    'description': splashEvent.description || splashEvent.about || '',
-    'event-type': splashEvent.event_type || splashEvent.type || '',
+    'splash-url': splashEvent.fq_url || '',
+    'description': splashEvent.description_text || '',
+    'event-type': eventType,
   };
 
   // Only add optional fields if they have values
@@ -187,8 +193,8 @@ function mapSplashToWebflow(splashEvent) {
   if (locationCity) fieldData['location-city'] = locationCity;
   if (locationState) fieldData['location-state'] = locationState;
 
-  // Image handling - Webflow needs a URL for images
-  const imageUrl = splashEvent.image_url || splashEvent.thumbnail || splashEvent.photo?.url;
+  // Image - from event_setting.header_image
+  const imageUrl = splashEvent.event_setting?.header_image;
   if (imageUrl) {
     fieldData['thumbnail'] = { url: imageUrl };
   }
@@ -204,7 +210,13 @@ async function sync() {
   console.log(`[${new Date().toISOString()}] Starting Splash → Webflow sync...`);
 
   // Validate environment
-  const required = ['SPLASH_CLIENT_ID', 'SPLASH_CLIENT_SECRET', 'WEBFLOW_API_TOKEN'];
+  const required = [
+    'SPLASH_CLIENT_ID',
+    'SPLASH_CLIENT_SECRET',
+    'SPLASH_USERNAME',
+    'SPLASH_PASSWORD',
+    'WEBFLOW_API_TOKEN',
+  ];
   const missing = required.filter(key => !process.env[key]);
   if (missing.length > 0) {
     throw new Error(`Missing required env vars: ${missing.join(', ')}`);
