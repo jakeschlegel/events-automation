@@ -20,7 +20,7 @@ const WEBFLOW_API_BASE = 'https://api.webflow.com/v2';
 // ============================================
 
 async function getSplashAccessToken() {
-  const response = await fetch(`${SPLASH_API_BASE}/oauth/token`, {
+  const response = await fetch(`${SPLASH_API_BASE}/oauth/v2/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -136,21 +136,6 @@ async function createWebflowEvent(eventData) {
 function mapSplashToWebflow(splashEvent) {
   /**
    * Map Splash event fields to Webflow collection fields.
-   * 
-   * Webflow fields (from your screenshot):
-   * - name (Plain text) - required
-   * - slug (Plain text) - auto-generated
-   * - date (Date/Time)
-   * - time (Plain text)
-   * - location-city (Plain text)
-   * - location-state (Plain text)
-   * - thumbnail (Image)
-   * - splash-url (Link)
-   * - featured (Switch)
-   * - splash-id (Plain text)
-   * - description (Rich text)
-   * - event-type (Plain text)
-   * 
    * Adjust the splash field names below based on actual API response.
    * Run with DEBUG=true to see raw Splash data.
    */
@@ -194,7 +179,6 @@ function mapSplashToWebflow(splashEvent) {
     'splash-url': splashEvent.url || splashEvent.event_url || splashEvent.registration_url || '',
     'description': splashEvent.description || splashEvent.about || '',
     'event-type': splashEvent.event_type || splashEvent.type || '',
-    'featured': false,
   };
 
   // Only add optional fields if they have values
@@ -270,7 +254,7 @@ async function sync() {
       synced++;
       console.log(`✓ Created: ${fieldData.name}`);
       
-      // Rate limiting - Webflow allows 60 requests/min
+      // Rate limiting - Splash: 2 req/s, Webflow: 60 req/min
       await new Promise(resolve => setTimeout(resolve, 1100));
     } catch (error) {
       console.error(`✗ Failed to create event ${event.id}: ${error.message}`);
