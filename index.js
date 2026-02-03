@@ -77,8 +77,26 @@ async function fetchSplashEvents(accessToken) {
   }
 
   const data = await response.json();
-  
+
   // Splash API typically returns { data: [...events] } or just [...events]
+  return data.data || data;
+}
+
+async function fetchSplashEventDetails(accessToken, eventId) {
+  // Fetch full event details which may include tagline
+  const response = await fetch(`${SPLASH_API_BASE}/events/${eventId}`, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Accept': 'application/json',
+    },
+  });
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Splash event details fetch failed: ${response.status} - ${text}`);
+  }
+
+  const data = await response.json();
   return data.data || data;
 }
 
@@ -320,21 +338,18 @@ async function sync() {
   const splashEvents = allSplashEvents.filter(event => event.published === true);
   console.log(`✓ ${splashEvents.length} are published (excluding ${allSplashEvents.length - splashEvents.length} templates)`);
 
-  // Debug: log event info
-  console.log('Events to consider:');
+  // Debug: fetch full event details and log
+  console.log('Fetching full event details...');
   for (const event of splashEvents) {
-    const headerImg = event.event_setting?.header_image || 'none';
-    console.log(`  - ${event.title}`);
-    console.log(`    published=${event.published}`);
-    console.log(`    event_type=${JSON.stringify(event.event_type)}`);
-    console.log(`    city="${event.city || ''}" state="${event.state || ''}"`);
-    console.log(`    header_image=${headerImg}`);
-    console.log(`    event_setting keys: ${Object.keys(event.event_setting || {}).join(', ')}`);
-    console.log(`    event_setting.header_text="${event.event_setting?.header_text || 'none'}"`);
-    console.log(`    event_setting.headline="${event.event_setting?.headline || 'none'}"`);
-    console.log(`    event_setting.header_subtitle="${event.event_setting?.header_subtitle || 'none'}"`);
-    console.log(`    event_setting.event_brief="${event.event_setting?.event_brief || 'none'}"`);
-    console.log(`    event_setting.blurb="${event.event_setting?.blurb || 'none'}"`);
+    console.log(`  - ${event.title} (id=${event.id})`);
+    const fullEvent = await fetchSplashEventDetails(accessToken, event.id);
+    console.log(`    FULL EVENT KEYS: ${Object.keys(fullEvent).join(', ')}`);
+    console.log(`    tagline="${fullEvent.tagline || 'none'}"`);
+    console.log(`    brief="${fullEvent.brief || 'none'}"`);
+    console.log(`    headline="${fullEvent.headline || 'none'}"`);
+    console.log(`    header_tagline="${fullEvent.header_tagline || 'none'}"`);
+    console.log(`    event_setting.tagline="${fullEvent.event_setting?.tagline || 'none'}"`);
+    console.log(`    event_setting.brief="${fullEvent.event_setting?.brief || 'none'}"`);
   }
 
   // 3. Get existing Splash IDs from Webflow
