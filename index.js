@@ -233,8 +233,10 @@ function mapSplashToWebflow(splashEvent, fieldSlugs) {
 
   // Add thumbnail if it exists
   const imageUrl = splashEvent.event_setting?.header_image;
+  console.log(`  Thumbnail check: fieldSlugs has 'thumbnail'=${fieldSlugs.has('thumbnail')}, imageUrl=${imageUrl || 'none'}`);
   if (fieldSlugs.has('thumbnail') && imageUrl) {
     fieldData['thumbnail'] = { url: imageUrl };
+    console.log(`  Added thumbnail: ${imageUrl}`);
   }
 
   // Add location fields if they exist (trying different slug patterns)
@@ -318,7 +320,8 @@ async function sync() {
   // Debug: log event info
   console.log('Events to consider:');
   for (const event of splashEvents) {
-    console.log(`  - ${event.title} | published=${event.published} | event_type=${JSON.stringify(event.event_type)}`);
+    const headerImg = event.event_setting?.header_image || 'none';
+    console.log(`  - ${event.title} | published=${event.published} | event_type=${JSON.stringify(event.event_type)} | header_image=${headerImg}`);
   }
 
   // 3. Get existing Splash IDs from Webflow
