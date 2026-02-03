@@ -321,7 +321,11 @@ async function sync() {
   console.log('Events to consider:');
   for (const event of splashEvents) {
     const headerImg = event.event_setting?.header_image || 'none';
-    console.log(`  - ${event.title} | published=${event.published} | event_type=${JSON.stringify(event.event_type)} | header_image=${headerImg}`);
+    console.log(`  - ${event.title}`);
+    console.log(`    published=${event.published}`);
+    console.log(`    event_type=${JSON.stringify(event.event_type)}`);
+    console.log(`    city="${event.city || ''}" state="${event.state || ''}"`);
+    console.log(`    header_image=${headerImg}`);
   }
 
   // 3. Get existing Splash IDs from Webflow
