@@ -3,6 +3,7 @@
  *
  * Polls Splash for events and creates them in Webflow CMS.
  * Uses Splash-ID field to prevent duplicates.
+ * Sends Slack notification when new events are synced.
  *
  * Environment variables required:
  * - SPLASH_CLIENT_ID
@@ -11,6 +12,7 @@
  * - SPLASH_PASSWORD (your Splash login password)
  * - WEBFLOW_API_TOKEN
  * - WEBFLOW_COLLECTION_ID (default: 69650c17f7e5c3ac3938b16d)
+ * - SLACK_WEBHOOK_URL (optional, for notifications)
  */
 
 const WEBFLOW_COLLECTION_ID = process.env.WEBFLOW_COLLECTION_ID || '69650c17f7e5c3ac3938b16d';
@@ -18,11 +20,78 @@ const SPLASH_API_BASE = 'https://api.splashthat.com';
 const WEBFLOW_API_BASE = 'https://api.webflow.com/v2';
 
 // ============================================
+// SLACK NOTIFICATIONS
+// ============================================
+
+async function sendSlackNotification(events) {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl) {
+    console.log('No SLACK_WEBHOOK_URL configured, skipping notification');
+    return;
+  }
+
+  const eventList = events.map(e => {
+    const date = e.event_start ? new Date(e.event_start).toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      year: 'numeric'
+    }) : 'TBD';
+    const location = [e.city, e.state].filter(Boolean).join(', ') || 'TBD';
+    return `• *${e.title}*\n   ${date} | ${location}\n   <${e.fq_url}|View in Splash>`;
+  }).join('\n\n');
+
+  const message = {
+    blocks: [
+      {
+        type: 'header',
+        text: {
+          type: 'plain_text',
+          text: `🎉 ${events.length} New Event${events.length > 1 ? 's' : ''} Synced to Webflow`,
+          emoji: true
+        }
+      },
+      {
+        type: 'section',
+        text: {
+          type: 'mrkdwn',
+          text: eventList
+        }
+      },
+      {
+        type: 'context',
+        elements: [
+          {
+            type: 'mrkdwn',
+            text: '👆 Please add descriptions manually in Webflow'
+          }
+        ]
+      }
+    ]
+  };
+
+  try {
+    const response = await fetch(webhookUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(message),
+    });
+
+    if (!response.ok) {
+      console.error(`Slack notification failed: ${response.status}`);
+    } else {
+      console.log('✓ Slack notification sent');
+    }
+  } catch (error) {
+    console.error(`Slack notification error: ${error.message}`);
+  }
+}
+
+// ============================================
 // SPLASH API
 // ============================================
 
 async function getSplashAccessToken() {
-  // Debug: log credential info (lengths and first/last chars only)
   const creds = {
     client_id: process.env.SPLASH_CLIENT_ID,
     client_secret: process.env.SPLASH_CLIENT_SECRET,
@@ -30,16 +99,6 @@ async function getSplashAccessToken() {
     password: process.env.SPLASH_PASSWORD,
   };
 
-  console.log('Credential check:');
-  for (const [key, val] of Object.entries(creds)) {
-    if (val) {
-      console.log(`  ${key}: len=${val.length}, starts="${val[0]}", ends="${val[val.length - 1]}"`);
-    } else {
-      console.log(`  ${key}: MISSING or empty`);
-    }
-  }
-
-  // Splash API uses multipart/form-data for OAuth
   const formData = new FormData();
   formData.append('client_id', creds.client_id);
   formData.append('client_secret', creds.client_secret);
@@ -63,7 +122,6 @@ async function getSplashAccessToken() {
 }
 
 async function fetchSplashEvents(accessToken) {
-  // Fetch upcoming/recent events - adjust query params as needed
   const response = await fetch(`${SPLASH_API_BASE}/events?upcoming=true&limit=50`, {
     headers: {
       'Authorization': `Bearer ${accessToken}`,
@@ -74,26 +132,6 @@ async function fetchSplashEvents(accessToken) {
   if (!response.ok) {
     const text = await response.text();
     throw new Error(`Splash events fetch failed: ${response.status} - ${text}`);
-  }
-
-  const data = await response.json();
-
-  // Splash API typically returns { data: [...events] } or just [...events]
-  return data.data || data;
-}
-
-async function fetchSplashEventDetails(accessToken, eventId) {
-  // Fetch full event details which may include tagline
-  const response = await fetch(`${SPLASH_API_BASE}/events/${eventId}`, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'Accept': 'application/json',
-    },
-  });
-
-  if (!response.ok) {
-    const text = await response.text();
-    throw new Error(`Splash event details fetch failed: ${response.status} - ${text}`);
   }
 
   const data = await response.json();
@@ -125,7 +163,6 @@ async function fetchCollectionSchema() {
 }
 
 async function fetchExistingSplashIds() {
-  // Get all existing events from Webflow to check for duplicates
   const existingIds = new Set();
   let offset = 0;
   const limit = 100;
@@ -150,7 +187,6 @@ async function fetchExistingSplashIds() {
     const items = data.items || [];
 
     for (const item of items) {
-      // The field slug for "Splash-ID" is likely "splash-id"
       const splashId = item.fieldData?.['splash-id'];
       if (splashId) {
         existingIds.add(splashId);
@@ -176,7 +212,7 @@ async function createWebflowEvent(eventData) {
       },
       body: JSON.stringify({
         isArchived: false,
-        isDraft: true, // Create as draft for review
+        isDraft: true,
         fieldData: eventData,
       }),
     }
@@ -195,21 +231,14 @@ async function createWebflowEvent(eventData) {
 // ============================================
 
 function mapSplashToWebflow(splashEvent, fieldSlugs) {
-  /**
-   * Map Splash event fields to Webflow collection fields.
-   * Only includes fields that exist in the Webflow schema.
-   */
-
   const title = splashEvent.title || 'Untitled Event';
 
-  // Generate slug from title
   const slug = title
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '')
     .substring(0, 100);
 
-  // Parse date/time from event_start
   let eventDate = null;
   let eventTime = '';
 
@@ -225,23 +254,19 @@ function mapSplashToWebflow(splashEvent, fieldSlugs) {
     }
   }
 
-  // Start with required fields only
   const fieldData = {
     'name': title,
     'slug': slug,
   };
 
-  // Add splash-id if it exists in schema
   if (fieldSlugs.has('splash-id')) {
     fieldData['splash-id'] = String(splashEvent.id);
   }
 
-  // Add splash-url if it exists
   if (fieldSlugs.has('splash-url') && splashEvent.fq_url) {
     fieldData['splash-url'] = splashEvent.fq_url;
   }
 
-  // Add date/time if they exist
   if (fieldSlugs.has('date') && eventDate) {
     fieldData['date'] = eventDate;
   }
@@ -249,18 +274,16 @@ function mapSplashToWebflow(splashEvent, fieldSlugs) {
     fieldData['time'] = eventTime;
   }
 
-  // Add thumbnail if it exists (convert HTTP to HTTPS for Webflow)
+  // Add thumbnail (convert HTTP to HTTPS for Webflow)
   let imageUrl = splashEvent.event_setting?.header_image;
   if (imageUrl && imageUrl.startsWith('http://')) {
     imageUrl = imageUrl.replace('http://', 'https://');
   }
-  console.log(`  Thumbnail check: fieldSlugs has 'thumbnail'=${fieldSlugs.has('thumbnail')}, imageUrl=${imageUrl || 'none'}`);
   if (fieldSlugs.has('thumbnail') && imageUrl) {
     fieldData['thumbnail'] = { url: imageUrl };
-    console.log(`  Added thumbnail: ${imageUrl}`);
   }
 
-  // Add location fields if they exist (trying different slug patterns)
+  // Add location fields
   const city = splashEvent.city || '';
   const state = splashEvent.state || '';
 
@@ -278,15 +301,7 @@ function mapSplashToWebflow(splashEvent, fieldSlugs) {
     }
   }
 
-  // Add description if it exists
-  for (const descSlug of ['description', 'description-2', 'event-description']) {
-    if (fieldSlugs.has(descSlug) && splashEvent.description_text) {
-      fieldData[descSlug] = splashEvent.description_text;
-      break;
-    }
-  }
-
-  // Add event type if it exists
+  // Add event type
   const eventType = splashEvent.event_type?.name || '';
   for (const typeSlug of ['event-type', 'event-type-2', 'eventtype', 'type']) {
     if (fieldSlugs.has(typeSlug) && eventType) {
@@ -305,7 +320,6 @@ function mapSplashToWebflow(splashEvent, fieldSlugs) {
 async function sync() {
   console.log(`[${new Date().toISOString()}] Starting Splash → Webflow sync...`);
 
-  // Validate environment
   const required = [
     'SPLASH_CLIENT_ID',
     'SPLASH_CLIENT_SECRET',
@@ -318,54 +332,24 @@ async function sync() {
     throw new Error(`Missing required env vars: ${missing.join(', ')}`);
   }
 
-  // 0. Fetch Webflow collection schema to see field slugs
-  console.log('Fetching Webflow collection schema...');
+  // Fetch Webflow collection schema
   const fields = await fetchCollectionSchema();
   const fieldSlugs = new Set(fields.map(f => f.slug));
-  console.log('Webflow field slugs:', Array.from(fieldSlugs).join(', '));
 
-  // 1. Auth with Splash
-  console.log('Authenticating with Splash...');
+  // Auth with Splash
   const accessToken = await getSplashAccessToken();
   console.log('✓ Splash auth successful');
 
-  // 2. Fetch events from Splash
-  console.log('Fetching events from Splash...');
+  // Fetch events from Splash
   const allSplashEvents = await fetchSplashEvents(accessToken);
-  console.log(`✓ Found ${allSplashEvents.length} total events in Splash`);
-
-  // Filter to only published events (exclude templates)
   const splashEvents = allSplashEvents.filter(event => event.published === true);
-  console.log(`✓ ${splashEvents.length} are published (excluding ${allSplashEvents.length - splashEvents.length} templates)`);
+  console.log(`✓ Found ${splashEvents.length} published events (${allSplashEvents.length - splashEvents.length} templates excluded)`);
 
-  // Debug: fetch full event details and log
-  console.log('Fetching full event details...');
-  for (const event of splashEvents) {
-    console.log(`  - ${event.title} (id=${event.id})`);
-    const fullEvent = await fetchSplashEventDetails(accessToken, event.id);
-    console.log(`    event_stages: ${JSON.stringify(fullEvent.event_stages)}`);
-    // Check for any field containing "Join" or "exclusive" or "Nightbird"
-    for (const [key, val] of Object.entries(fullEvent)) {
-      if (typeof val === 'string' && (val.includes('Join') || val.includes('exclusive') || val.includes('Nightbird'))) {
-        console.log(`    FOUND IN ${key}: "${val.substring(0, 100)}..."`);
-      }
-    }
-    // Also check nested event_setting
-    if (fullEvent.event_setting) {
-      for (const [key, val] of Object.entries(fullEvent.event_setting)) {
-        if (typeof val === 'string' && (val.includes('Join') || val.includes('exclusive') || val.includes('Nightbird'))) {
-          console.log(`    FOUND IN event_setting.${key}: "${val.substring(0, 100)}..."`);
-        }
-      }
-    }
-  }
-
-  // 3. Get existing Splash IDs from Webflow
-  console.log('Checking existing events in Webflow...');
+  // Get existing Splash IDs from Webflow
   const existingIds = await fetchExistingSplashIds();
   console.log(`✓ Found ${existingIds.size} existing events in Webflow`);
 
-  // 4. Filter to new events only
+  // Filter to new events only
   const newEvents = splashEvents.filter(event => !existingIds.has(String(event.id)));
   console.log(`→ ${newEvents.length} new events to sync`);
 
@@ -374,23 +358,20 @@ async function sync() {
     return { synced: 0, total: splashEvents.length };
   }
 
-  // 5. Create new events in Webflow
+  // Create new events in Webflow
   let synced = 0;
+  const syncedEvents = [];
   const errors = [];
 
   for (const event of newEvents) {
     try {
       const fieldData = mapSplashToWebflow(event, fieldSlugs);
-
-      if (process.env.DEBUG) {
-        console.log('Mapped field data:', JSON.stringify(fieldData, null, 2));
-      }
-
       await createWebflowEvent(fieldData);
       synced++;
+      syncedEvents.push(event);
       console.log(`✓ Created: ${fieldData.name}`);
-      
-      // Rate limiting - Splash: 2 req/s, Webflow: 60 req/min
+
+      // Rate limiting
       await new Promise(resolve => setTimeout(resolve, 1100));
     } catch (error) {
       console.error(`✗ Failed to create event ${event.id}: ${error.message}`);
@@ -399,7 +380,12 @@ async function sync() {
   }
 
   console.log(`\n[${new Date().toISOString()}] Sync complete: ${synced}/${newEvents.length} events created`);
-  
+
+  // Send Slack notification for synced events
+  if (syncedEvents.length > 0) {
+    await sendSlackNotification(syncedEvents);
+  }
+
   if (errors.length > 0) {
     console.log('Errors:', errors);
   }
