@@ -22,14 +22,31 @@ const WEBFLOW_API_BASE = 'https://api.webflow.com/v2';
 // ============================================
 
 async function getSplashAccessToken() {
+  // Debug: log credential info (lengths and first/last chars only)
+  const creds = {
+    client_id: process.env.SPLASH_CLIENT_ID,
+    client_secret: process.env.SPLASH_CLIENT_SECRET,
+    username: process.env.SPLASH_USERNAME,
+    password: process.env.SPLASH_PASSWORD,
+  };
+
+  console.log('Credential check:');
+  for (const [key, val] of Object.entries(creds)) {
+    if (val) {
+      console.log(`  ${key}: len=${val.length}, starts="${val[0]}", ends="${val[val.length - 1]}"`);
+    } else {
+      console.log(`  ${key}: MISSING or empty`);
+    }
+  }
+
   // Splash API uses multipart/form-data for OAuth
   const formData = new FormData();
-  formData.append('client_id', process.env.SPLASH_CLIENT_ID);
-  formData.append('client_secret', process.env.SPLASH_CLIENT_SECRET);
+  formData.append('client_id', creds.client_id);
+  formData.append('client_secret', creds.client_secret);
   formData.append('grant_type', 'password');
   formData.append('scope', 'user');
-  formData.append('username', process.env.SPLASH_USERNAME);
-  formData.append('password', process.env.SPLASH_PASSWORD);
+  formData.append('username', creds.username);
+  formData.append('password', creds.password);
 
   const response = await fetch(`${SPLASH_API_BASE}/oauth/v2/token`, {
     method: 'POST',
