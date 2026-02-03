@@ -250,7 +250,7 @@ function mapSplashToWebflow(splashEvent, fieldSlugs) {
     }
   }
 
-  for (const stateSlug of ['location-state', 'location---state', 'locationstate']) {
+  for (const stateSlug of ['location-state', 'location---state', 'location---state-2', 'locationstate']) {
     if (fieldSlugs.has(stateSlug) && state) {
       fieldData[stateSlug] = state;
       break;
@@ -258,7 +258,7 @@ function mapSplashToWebflow(splashEvent, fieldSlugs) {
   }
 
   // Add description if it exists
-  for (const descSlug of ['description', 'event-description']) {
+  for (const descSlug of ['description', 'description-2', 'event-description']) {
     if (fieldSlugs.has(descSlug) && splashEvent.description_text) {
       fieldData[descSlug] = splashEvent.description_text;
       break;
@@ -267,7 +267,7 @@ function mapSplashToWebflow(splashEvent, fieldSlugs) {
 
   // Add event type if it exists
   const eventType = splashEvent.event_type?.name || '';
-  for (const typeSlug of ['event-type', 'eventtype', 'type']) {
+  for (const typeSlug of ['event-type', 'event-type-2', 'eventtype', 'type']) {
     if (fieldSlugs.has(typeSlug) && eventType) {
       fieldData[typeSlug] = eventType;
       break;
