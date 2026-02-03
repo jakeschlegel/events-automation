@@ -86,6 +86,26 @@ async function fetchSplashEvents(accessToken) {
 // WEBFLOW API
 // ============================================
 
+async function fetchCollectionSchema() {
+  const response = await fetch(
+    `${WEBFLOW_API_BASE}/collections/${WEBFLOW_COLLECTION_ID}`,
+    {
+      headers: {
+        'Authorization': `Bearer ${process.env.WEBFLOW_API_TOKEN}`,
+        'Accept': 'application/json',
+      },
+    }
+  );
+
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Webflow schema fetch failed: ${response.status} - ${text}`);
+  }
+
+  const data = await response.json();
+  return data.fields || [];
+}
+
 async function fetchExistingSplashIds() {
   // Get all existing events from Webflow to check for duplicates
   const existingIds = new Set();
@@ -238,6 +258,14 @@ async function sync() {
   const missing = required.filter(key => !process.env[key]);
   if (missing.length > 0) {
     throw new Error(`Missing required env vars: ${missing.join(', ')}`);
+  }
+
+  // 0. Fetch Webflow collection schema to see field slugs
+  console.log('Fetching Webflow collection schema...');
+  const fields = await fetchCollectionSchema();
+  console.log('Webflow field slugs:');
+  for (const field of fields) {
+    console.log(`  ${field.slug} (${field.type})`);
   }
 
   // 1. Auth with Splash
