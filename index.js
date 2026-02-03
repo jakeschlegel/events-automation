@@ -329,11 +329,14 @@ async function sync() {
     console.log(`    event_type=${JSON.stringify(event.event_type)}`);
     console.log(`    city="${event.city || ''}" state="${event.state || ''}"`);
     console.log(`    header_image=${headerImg}`);
-    console.log(`    description_text="${event.description_text || 'none'}"`);
-    console.log(`    tagline="${event.tagline || 'none'}"`);
-    console.log(`    subtitle="${event.subtitle || 'none'}"`);
-    console.log(`    event_setting keys: ${Object.keys(event.event_setting || {}).join(', ')}`);
-    console.log(`    Full event_setting: ${JSON.stringify(event.event_setting, null, 2)}`);
+    console.log(`    TOP-LEVEL EVENT KEYS: ${Object.keys(event).join(', ')}`);
+    console.log(`    brief="${event.brief || 'none'}"`);
+    console.log(`    header_tagline="${event.header_tagline || 'none'}"`);
+    console.log(`    short_description="${event.short_description || 'none'}"`);
+    console.log(`    summary="${event.summary || 'none'}"`);
+    console.log(`    event_setting.header_tagline="${event.event_setting?.header_tagline || 'none'}"`);
+    console.log(`    event_setting.tagline="${event.event_setting?.tagline || 'none'}"`);
+    console.log(`    event_setting.subheading="${event.event_setting?.subheading || 'none'}"`);
   }
 
   // 3. Get existing Splash IDs from Webflow
