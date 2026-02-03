@@ -329,14 +329,11 @@ async function sync() {
     console.log(`    event_type=${JSON.stringify(event.event_type)}`);
     console.log(`    city="${event.city || ''}" state="${event.state || ''}"`);
     console.log(`    header_image=${headerImg}`);
-    console.log(`    TOP-LEVEL EVENT KEYS: ${Object.keys(event).join(', ')}`);
-    console.log(`    brief="${event.brief || 'none'}"`);
-    console.log(`    header_tagline="${event.header_tagline || 'none'}"`);
-    console.log(`    short_description="${event.short_description || 'none'}"`);
-    console.log(`    summary="${event.summary || 'none'}"`);
-    console.log(`    event_setting.header_tagline="${event.event_setting?.header_tagline || 'none'}"`);
-    console.log(`    event_setting.tagline="${event.event_setting?.tagline || 'none'}"`);
-    console.log(`    event_setting.subheading="${event.event_setting?.subheading || 'none'}"`);
+    console.log(`    description (HTML)="${event.description || 'none'}"`);
+    console.log(`    splash_theme keys: ${Object.keys(event.splash_theme || {}).join(', ')}`);
+    console.log(`    splash_theme.tagline="${event.splash_theme?.tagline || 'none'}"`);
+    console.log(`    splash_theme.subheading="${event.splash_theme?.subheading || 'none'}"`);
+    console.log(`    splash_theme.brief="${event.splash_theme?.brief || 'none'}"`);
   }
 
   // 3. Get existing Splash IDs from Webflow
