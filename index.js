@@ -308,11 +308,17 @@ async function sync() {
 
   // 2. Fetch events from Splash
   console.log('Fetching events from Splash...');
-  const splashEvents = await fetchSplashEvents(accessToken);
-  console.log(`✓ Found ${splashEvents.length} events in Splash`);
+  const allSplashEvents = await fetchSplashEvents(accessToken);
+  console.log(`✓ Found ${allSplashEvents.length} total events in Splash`);
 
-  if (process.env.DEBUG) {
-    console.log('Raw Splash event sample:', JSON.stringify(splashEvents[0], null, 2));
+  // Filter to only published events (exclude templates)
+  const splashEvents = allSplashEvents.filter(event => event.published === true);
+  console.log(`✓ ${splashEvents.length} are published (excluding ${allSplashEvents.length - splashEvents.length} templates)`);
+
+  // Debug: log event info
+  console.log('Events to consider:');
+  for (const event of splashEvents) {
+    console.log(`  - ${event.title} | published=${event.published} | event_type=${JSON.stringify(event.event_type)}`);
   }
 
   // 3. Get existing Splash IDs from Webflow
