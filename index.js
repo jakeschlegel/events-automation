@@ -343,13 +343,21 @@ async function sync() {
   for (const event of splashEvents) {
     console.log(`  - ${event.title} (id=${event.id})`);
     const fullEvent = await fetchSplashEventDetails(accessToken, event.id);
-    console.log(`    FULL EVENT KEYS: ${Object.keys(fullEvent).join(', ')}`);
-    console.log(`    tagline="${fullEvent.tagline || 'none'}"`);
-    console.log(`    brief="${fullEvent.brief || 'none'}"`);
-    console.log(`    headline="${fullEvent.headline || 'none'}"`);
-    console.log(`    header_tagline="${fullEvent.header_tagline || 'none'}"`);
-    console.log(`    event_setting.tagline="${fullEvent.event_setting?.tagline || 'none'}"`);
-    console.log(`    event_setting.brief="${fullEvent.event_setting?.brief || 'none'}"`);
+    console.log(`    event_stages: ${JSON.stringify(fullEvent.event_stages)}`);
+    // Check for any field containing "Join" or "exclusive" or "Nightbird"
+    for (const [key, val] of Object.entries(fullEvent)) {
+      if (typeof val === 'string' && (val.includes('Join') || val.includes('exclusive') || val.includes('Nightbird'))) {
+        console.log(`    FOUND IN ${key}: "${val.substring(0, 100)}..."`);
+      }
+    }
+    // Also check nested event_setting
+    if (fullEvent.event_setting) {
+      for (const [key, val] of Object.entries(fullEvent.event_setting)) {
+        if (typeof val === 'string' && (val.includes('Join') || val.includes('exclusive') || val.includes('Nightbird'))) {
+          console.log(`    FOUND IN event_setting.${key}: "${val.substring(0, 100)}..."`);
+        }
+      }
+    }
   }
 
   // 3. Get existing Splash IDs from Webflow
