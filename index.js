@@ -329,11 +329,12 @@ async function sync() {
     console.log(`    event_type=${JSON.stringify(event.event_type)}`);
     console.log(`    city="${event.city || ''}" state="${event.state || ''}"`);
     console.log(`    header_image=${headerImg}`);
-    console.log(`    description (HTML)="${event.description || 'none'}"`);
-    console.log(`    splash_theme keys: ${Object.keys(event.splash_theme || {}).join(', ')}`);
-    console.log(`    splash_theme.tagline="${event.splash_theme?.tagline || 'none'}"`);
-    console.log(`    splash_theme.subheading="${event.splash_theme?.subheading || 'none'}"`);
-    console.log(`    splash_theme.brief="${event.splash_theme?.brief || 'none'}"`);
+    console.log(`    event_setting keys: ${Object.keys(event.event_setting || {}).join(', ')}`);
+    console.log(`    event_setting.header_text="${event.event_setting?.header_text || 'none'}"`);
+    console.log(`    event_setting.headline="${event.event_setting?.headline || 'none'}"`);
+    console.log(`    event_setting.header_subtitle="${event.event_setting?.header_subtitle || 'none'}"`);
+    console.log(`    event_setting.event_brief="${event.event_setting?.event_brief || 'none'}"`);
+    console.log(`    event_setting.blurb="${event.event_setting?.blurb || 'none'}"`);
   }
 
   // 3. Get existing Splash IDs from Webflow
