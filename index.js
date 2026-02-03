@@ -231,8 +231,11 @@ function mapSplashToWebflow(splashEvent, fieldSlugs) {
     fieldData['time'] = eventTime;
   }
 
-  // Add thumbnail if it exists
-  const imageUrl = splashEvent.event_setting?.header_image;
+  // Add thumbnail if it exists (convert HTTP to HTTPS for Webflow)
+  let imageUrl = splashEvent.event_setting?.header_image;
+  if (imageUrl && imageUrl.startsWith('http://')) {
+    imageUrl = imageUrl.replace('http://', 'https://');
+  }
   console.log(`  Thumbnail check: fieldSlugs has 'thumbnail'=${fieldSlugs.has('thumbnail')}, imageUrl=${imageUrl || 'none'}`);
   if (fieldSlugs.has('thumbnail') && imageUrl) {
     fieldData['thumbnail'] = { url: imageUrl };
