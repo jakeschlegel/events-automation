@@ -329,6 +329,10 @@ async function sync() {
     console.log(`    event_type=${JSON.stringify(event.event_type)}`);
     console.log(`    city="${event.city || ''}" state="${event.state || ''}"`);
     console.log(`    header_image=${headerImg}`);
+    console.log(`    description_text="${event.description_text || 'none'}"`);
+    console.log(`    tagline="${event.tagline || 'none'}"`);
+    console.log(`    subtitle="${event.subtitle || 'none'}"`);
+    console.log(`    event_setting.description="${event.event_setting?.description || 'none'}"`);
   }
 
   // 3. Get existing Splash IDs from Webflow
