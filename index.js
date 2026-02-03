@@ -332,7 +332,8 @@ async function sync() {
     console.log(`    description_text="${event.description_text || 'none'}"`);
     console.log(`    tagline="${event.tagline || 'none'}"`);
     console.log(`    subtitle="${event.subtitle || 'none'}"`);
-    console.log(`    event_setting.description="${event.event_setting?.description || 'none'}"`);
+    console.log(`    event_setting keys: ${Object.keys(event.event_setting || {}).join(', ')}`);
+    console.log(`    Full event_setting: ${JSON.stringify(event.event_setting, null, 2)}`);
   }
 
   // 3. Get existing Splash IDs from Webflow
