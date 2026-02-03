@@ -176,11 +176,10 @@ async function createWebflowEvent(eventData) {
 // FIELD MAPPING
 // ============================================
 
-function mapSplashToWebflow(splashEvent) {
+function mapSplashToWebflow(splashEvent, fieldSlugs) {
   /**
    * Map Splash event fields to Webflow collection fields.
-   * Based on actual Splash API v2.2 response structure.
-   * Run with DEBUG=true to see raw Splash data.
+   * Only includes fields that exist in the Webflow schema.
    */
 
   const title = splashEvent.title || 'Untitled Event';
@@ -192,7 +191,7 @@ function mapSplashToWebflow(splashEvent) {
     .replace(/^-|-$/g, '')
     .substring(0, 100);
 
-  // Parse date/time from event_start (ISO format like "2020-09-30T19:00:00-0400")
+  // Parse date/time from event_start
   let eventDate = null;
   let eventTime = '';
 
@@ -208,33 +207,69 @@ function mapSplashToWebflow(splashEvent) {
     }
   }
 
-  // Location - direct fields on event
-  const locationCity = splashEvent.city || '';
-  const locationState = splashEvent.state || '';
-
-  // Event type - nested object with name
-  const eventType = splashEvent.event_type?.name || '';
-
-  // Build the field data object
+  // Start with required fields only
   const fieldData = {
     'name': title,
     'slug': slug,
-    'splash-id': String(splashEvent.id),
-    'splash-url': splashEvent.fq_url || '',
-    'description': splashEvent.description_text || '',
-    'event-type': eventType,
   };
 
-  // Only add optional fields if they have values
-  if (eventDate) fieldData['date'] = eventDate;
-  if (eventTime) fieldData['time'] = eventTime;
-  if (locationCity) fieldData['location-city'] = locationCity;
-  if (locationState) fieldData['location-state'] = locationState;
+  // Add splash-id if it exists in schema
+  if (fieldSlugs.has('splash-id')) {
+    fieldData['splash-id'] = String(splashEvent.id);
+  }
 
-  // Image - from event_setting.header_image
+  // Add splash-url if it exists
+  if (fieldSlugs.has('splash-url') && splashEvent.fq_url) {
+    fieldData['splash-url'] = splashEvent.fq_url;
+  }
+
+  // Add date/time if they exist
+  if (fieldSlugs.has('date') && eventDate) {
+    fieldData['date'] = eventDate;
+  }
+  if (fieldSlugs.has('time') && eventTime) {
+    fieldData['time'] = eventTime;
+  }
+
+  // Add thumbnail if it exists
   const imageUrl = splashEvent.event_setting?.header_image;
-  if (imageUrl) {
+  if (fieldSlugs.has('thumbnail') && imageUrl) {
     fieldData['thumbnail'] = { url: imageUrl };
+  }
+
+  // Add location fields if they exist (trying different slug patterns)
+  const city = splashEvent.city || '';
+  const state = splashEvent.state || '';
+
+  for (const citySlug of ['location-city', 'location---city', 'locationcity']) {
+    if (fieldSlugs.has(citySlug) && city) {
+      fieldData[citySlug] = city;
+      break;
+    }
+  }
+
+  for (const stateSlug of ['location-state', 'location---state', 'locationstate']) {
+    if (fieldSlugs.has(stateSlug) && state) {
+      fieldData[stateSlug] = state;
+      break;
+    }
+  }
+
+  // Add description if it exists
+  for (const descSlug of ['description', 'event-description']) {
+    if (fieldSlugs.has(descSlug) && splashEvent.description_text) {
+      fieldData[descSlug] = splashEvent.description_text;
+      break;
+    }
+  }
+
+  // Add event type if it exists
+  const eventType = splashEvent.event_type?.name || '';
+  for (const typeSlug of ['event-type', 'eventtype', 'type']) {
+    if (fieldSlugs.has(typeSlug) && eventType) {
+      fieldData[typeSlug] = eventType;
+      break;
+    }
   }
 
   return fieldData;
@@ -263,10 +298,8 @@ async function sync() {
   // 0. Fetch Webflow collection schema to see field slugs
   console.log('Fetching Webflow collection schema...');
   const fields = await fetchCollectionSchema();
-  console.log('Webflow field slugs:');
-  for (const field of fields) {
-    console.log(`  ${field.slug} (${field.type})`);
-  }
+  const fieldSlugs = new Set(fields.map(f => f.slug));
+  console.log('Webflow field slugs:', Array.from(fieldSlugs).join(', '));
 
   // 1. Auth with Splash
   console.log('Authenticating with Splash...');
@@ -302,8 +335,8 @@ async function sync() {
 
   for (const event of newEvents) {
     try {
-      const fieldData = mapSplashToWebflow(event);
-      
+      const fieldData = mapSplashToWebflow(event, fieldSlugs);
+
       if (process.env.DEBUG) {
         console.log('Mapped field data:', JSON.stringify(fieldData, null, 2));
       }
