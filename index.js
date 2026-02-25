@@ -301,6 +301,24 @@ function mapSplashToWebflow(splashEvent, fieldSlugs) {
     }
   }
 
+  // Add venue
+  const venue = splashEvent.venue_name || '';
+  for (const venueSlug of ['venue', 'venue-name', 'venue-name-2']) {
+    if (fieldSlugs.has(venueSlug) && venue) {
+      fieldData[venueSlug] = venue;
+      break;
+    }
+  }
+
+  // Add address
+  const address = splashEvent.address || '';
+  for (const addrSlug of ['address', 'address-2', 'venue-address']) {
+    if (fieldSlugs.has(addrSlug) && address) {
+      fieldData[addrSlug] = address;
+      break;
+    }
+  }
+
   // Add event type
   const eventType = splashEvent.event_type?.name || '';
   for (const typeSlug of ['event-type', 'event-type-2', 'eventtype', 'type']) {
